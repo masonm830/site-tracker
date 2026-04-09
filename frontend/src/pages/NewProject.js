@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Header from '../components/Header';
+import { getToken } from '../utils/auth';
 
 const API = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
@@ -103,7 +104,9 @@ function NewProject() {
     setError(null);
     setSubmitting(true);
     try {
-      const res = await axios.post(`${API}/api/projects`, form);
+      const res = await axios.post(`${API}/api/projects`, form, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
       navigate(`/projects/${res.data.id}`);
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to create project. Please try again.');

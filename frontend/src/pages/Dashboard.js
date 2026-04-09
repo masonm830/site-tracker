@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Header from '../components/Header';
+import { getToken } from '../utils/auth';
 
 const API = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
@@ -100,7 +101,9 @@ function Dashboard() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    axios.get(`${API}/api/projects`)
+    axios.get(`${API}/api/projects`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    })
       .then(res => setProjects(res.data))
       .catch(() => setError('Could not load projects. Is the backend running?'))
       .finally(() => setLoading(false));

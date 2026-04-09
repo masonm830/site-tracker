@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Header from '../components/Header';
+import { getToken } from '../utils/auth';
 
 const API = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
@@ -184,7 +185,9 @@ function ProjectDetail() {
   const fileRef = useRef();
 
   useEffect(() => {
-    axios.get(`${API}/api/projects/${id}`)
+    axios.get(`${API}/api/projects/${id}`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    })
       .then(res => {
         setProject(res.data);
         setLogs(res.data.logs || []);
@@ -214,7 +217,10 @@ function ProjectDetail() {
         const formData = new FormData();
         formData.append('file', file);
         const uploadRes = await axios.post(`${API}/api/upload`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            Authorization: `Bearer ${getToken()}`,
+          },
         });
         photo_url = uploadRes.data.url;
       }
@@ -224,6 +230,8 @@ function ProjectDetail() {
         project_id: id,
         note: note.trim(),
         photo_url,
+      }, {
+        headers: { Authorization: `Bearer ${getToken()}` },
       });
 
       setLogs(prev => [logRes.data, ...prev]);

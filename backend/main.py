@@ -1,5 +1,6 @@
 import os
 import uuid
+from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException, UploadFile, File, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -48,9 +49,52 @@ class LogCreate(BaseModel):
     photo_url: str | None = None
 
 
+class ProjectUpdate(BaseModel):
+    name: str | None = None
+    address: str | None = None
+    client_name: str | None = None
+    client_email: str | None = None
+
+
+class LogUpdate(BaseModel):
+    note: str | None = None
+    photo_urls: list[str] | None = None
+
+
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+
+# --- Helpers ---
+
+def extract_storage_filename(url: str) -> str | None:
+    """Extract the storage filename from a Supabase public URL."""
+    if not url:
+        return None
+    try:
+        parts = url.split("/site-photos/")
+        if len(parts) == 2:
+            return parts[1]
+    except Exception:
+        pass
+    return None
+
+
+def normalize_photo_urls(log: dict) -> list[str]:
+    """Return a unified photo_urls list, falling back to legacy photo_url for backward compat."""
+    urls = list(log.get("photo_urls") or [])
+    if not urls and log.get("photo_url"):
+        urls = [log["photo_url"]]
+    return urls
+
+
+def all_photo_filenames(log: dict) -> list[str]:
+    """Collect all storage filenames across both photo_url and photo_urls fields."""
+    all_urls = set(normalize_photo_urls(log))
+    if log.get("photo_url"):
+        all_urls.add(log["photo_url"])
+    return [f for f in (extract_storage_filename(u) for u in all_urls) if f]
 
 
 # --- Auth dependency ---
@@ -134,8 +178,13 @@ def create_project(project: ProjectCreate, current_user: dict = Depends(get_curr
         "share_token": share_token,
         "superintendent_id": current_user["id"],
     }
-    result = supabase.table("projects").insert(data).execute()
+    try:
+        result = supabase.table("projects").insert(data).execute()
+    except Exception as e:
+        print(f"[create_project] Supabase insert error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create project")
     if not result.data:
+        print(f"[create_project] Insert returned no data. Result: {result}")
         raise HTTPException(status_code=500, detail="Failed to create project")
     return result.data[0]
 
@@ -167,8 +216,45 @@ def get_project(project_id: str, current_user: dict = Depends(get_current_user))
         .execute()
     )
 
-    project["logs"] = logs_result.data
+    logs = logs_result.data
+    for log in logs:
+        log["photo_urls"] = normalize_photo_urls(log)
+    project["logs"] = logs
     return project
+
+
+@app.patch("/api/projects/{project_id}")
+def update_project(project_id: str, body: ProjectUpdate, current_user: dict = Depends(get_current_user)):
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    updates = body.model_dump(exclude_none=True)
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    result = supabase.table("projects").update(updates).eq("id", project_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return result.data[0]
+
+
+@app.delete("/api/projects/{project_id}", status_code=204)
+def delete_project(project_id: str, current_user: dict = Depends(get_current_user)):
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    project_result = supabase.table("projects").select("id").eq("id", project_id).maybe_single().execute()
+    if not project_result.data:
+        raise HTTPException(status_code=404, detail="Project not found")
+    logs_result = supabase.table("logs").select("photo_url, photo_urls").eq("project_id", project_id).execute()
+    if logs_result.data:
+        filenames = []
+        for log in logs_result.data:
+            filenames.extend(all_photo_filenames(log))
+        if filenames:
+            try:
+                supabase.storage.from_("site-photos").remove(filenames)
+            except Exception as e:
+                print(f"[delete_project] Storage cleanup error: {e}")
+    supabase.table("logs").delete().eq("project_id", project_id).execute()
+    supabase.table("projects").delete().eq("id", project_id).execute()
 
 
 # --- Logs ---
@@ -186,6 +272,55 @@ def create_log(log: LogCreate, current_user: dict = Depends(get_current_user)):
     return result.data[0]
 
 
+@app.patch("/api/logs/{log_id}")
+def update_log(log_id: str, body: LogUpdate, current_user: dict = Depends(get_current_user)):
+    log_result = (
+        supabase.table("logs")
+        .select("*, projects(superintendent_id)")
+        .eq("id", log_id)
+        .maybe_single()
+        .execute()
+    )
+    if not log_result.data:
+        raise HTTPException(status_code=404, detail="Log not found")
+    log = log_result.data
+    superintendent_id = (log.get("projects") or {}).get("superintendent_id")
+    if current_user["role"] != "admin" and current_user["id"] != superintendent_id:
+        raise HTTPException(status_code=403, detail="Not authorized to edit this log")
+    updates = body.model_dump(exclude_unset=True)
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+    result = supabase.table("logs").update(updates).eq("id", log_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Log not found")
+    return result.data[0]
+
+
+@app.delete("/api/logs/{log_id}", status_code=204)
+def delete_log(log_id: str, current_user: dict = Depends(get_current_user)):
+    log_result = (
+        supabase.table("logs")
+        .select("*, projects(superintendent_id)")
+        .eq("id", log_id)
+        .maybe_single()
+        .execute()
+    )
+    if not log_result.data:
+        raise HTTPException(status_code=404, detail="Log not found")
+    log = log_result.data
+    superintendent_id = (log.get("projects") or {}).get("superintendent_id")
+    if current_user["role"] != "admin" and current_user["id"] != superintendent_id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this log")
+    filenames = all_photo_filenames(log)
+    if filenames:
+        try:
+            supabase.storage.from_("site-photos").remove(filenames)
+        except Exception as e:
+            print(f"[delete_log] Storage cleanup error: {e}")
+    supabase.table("logs").delete().eq("id", log_id).execute()
+
+
 # --- Public share endpoint ---
 
 @app.get("/api/projects/share/{share_token}")
@@ -194,7 +329,7 @@ def get_project_by_share_token(share_token: str):
         supabase.table("projects")
         .select("*")
         .eq("share_token", share_token)
-        .single()
+        .maybe_single()
         .execute()
     )
     if not project_result.data:
@@ -209,7 +344,10 @@ def get_project_by_share_token(share_token: str):
     )
 
     project = project_result.data
-    project["logs"] = logs_result.data
+    logs = logs_result.data
+    for log in logs:
+        log["photo_urls"] = normalize_photo_urls(log)
+    project["logs"] = logs
     return project
 
 

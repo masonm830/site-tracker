@@ -111,6 +111,25 @@ const styles = {
     maxHeight: 420,
     objectFit: 'cover',
   },
+  photoGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+    gap: 4,
+  },
+  photoGridImg: {
+    width: '100%',
+    height: 200,
+    objectFit: 'cover',
+    display: 'block',
+  },
+  photoBadge: {
+    background: '#f1f5f9',
+    color: '#64748b',
+    borderRadius: 6,
+    padding: '3px 10px',
+    fontSize: 12,
+    fontWeight: 500,
+  },
   entryBody: { padding: '20px 24px' },
   entryNote: {
     fontSize: 15,
@@ -261,22 +280,35 @@ function ClientShare() {
           </div>
         ) : (
           <div style={styles.timeline}>
-            {logs.map((log, i) => (
-              <div key={log.id} style={styles.entry}>
-                {log.photo_url && (
-                  <img src={log.photo_url} alt={`Site update ${i + 1}`} style={styles.entryPhoto} />
-                )}
-                <div style={styles.entryBody}>
-                  {log.note && <p style={styles.entryNote}>{log.note}</p>}
-                  <div style={styles.entryFooter}>
-                    <span style={styles.entryDateBadge}>{formatDate(log.created_at)}</span>
-                    <span style={{ ...styles.entryDateBadge, background: 'transparent', paddingLeft: 0 }}>
-                      {formatTime(log.created_at)}
-                    </span>
+            {logs.map((log, i) => {
+              const photos = log.photo_urls || (log.photo_url ? [log.photo_url] : []);
+              return (
+                <div key={log.id} style={styles.entry}>
+                  {photos.length === 1 && (
+                    <img src={photos[0]} alt={`Site update ${i + 1}`} style={styles.entryPhoto} />
+                  )}
+                  {photos.length > 1 && (
+                    <div style={styles.photoGrid}>
+                      {photos.map((url, j) => (
+                        <img key={j} src={url} alt={`Site update ${i + 1} photo ${j + 1}`} style={styles.photoGridImg} />
+                      ))}
+                    </div>
+                  )}
+                  <div style={styles.entryBody}>
+                    {log.note && <p style={styles.entryNote}>{log.note}</p>}
+                    <div style={styles.entryFooter}>
+                      <span style={styles.entryDateBadge}>{formatDate(log.created_at)}</span>
+                      <span style={{ ...styles.entryDateBadge, background: 'transparent', paddingLeft: 0 }}>
+                        {formatTime(log.created_at)}
+                      </span>
+                      {photos.length > 0 && (
+                        <span style={styles.photoBadge}>📷 {photos.length} {photos.length === 1 ? 'photo' : 'photos'}</span>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>

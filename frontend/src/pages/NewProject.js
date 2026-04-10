@@ -109,6 +109,7 @@ function NewProject() {
       });
       navigate(`/projects/${res.data.id}`);
     } catch (err) {
+      console.error('[NewProject] Create project error:', err.response ?? err);
       setError(err.response?.data?.detail || 'Failed to create project. Please try again.');
       setSubmitting(false);
     }

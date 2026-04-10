@@ -108,8 +108,8 @@ function Login() {
     setLoading(true);
     try {
       const res = await axios.post(`${API}/api/auth/login`, { email, password });
-      localStorage.setItem('token', res.data.token);
-      localStorage.setItem('user', JSON.stringify({ email: res.data.email, role: res.data.role }));
+      sessionStorage.setItem('token', res.data.token);
+      sessionStorage.setItem('user', JSON.stringify({ email: res.data.email, role: res.data.role }));
       navigate('/');
     } catch (err) {
       setError(err.response?.data?.detail || 'Login failed. Check your credentials.');

@@ -499,7 +499,7 @@ function ProjectDetail() {
                   {photos.length === 1 && <img src={photos[0]} alt="Site" style={s.entryPhoto} />}
                   {photos.length > 1 && (
                     <div style={s.photoGrid}>
-                      {photos.map((url, i) => <img key={i} src={url} alt={`Site photo ${i + 1}`} style={s.photoGridImg} />)}
+                      {photos.map((url, i) => <img key={i} src={url} alt={`Construction update ${i + 1}`} style={s.photoGridImg} />)}
                     </div>
                   )}
                   <div style={s.entryBody}>

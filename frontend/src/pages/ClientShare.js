@@ -182,7 +182,7 @@ function ClientShare() {
                         <img
                           key={j}
                           src={url}
-                          alt={`Site update ${i + 1} photo ${j + 1}`}
+                          alt={`Construction progress, update ${i + 1}, view ${j + 1}`}
                           style={{ width: '100%', height: 260, objectFit: 'cover', display: 'block' }}
                         />
                       ))}

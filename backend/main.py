@@ -191,10 +191,7 @@ def create_project(project: ProjectCreate, current_user: dict = Depends(get_curr
 
 @app.get("/api/projects")
 def get_projects(current_user: dict = Depends(get_current_user)):
-    query = supabase.table("projects").select("*").order("created_at", desc=True)
-    if current_user["role"] != "admin":
-        query = query.eq("superintendent_id", current_user["id"])
-    result = query.execute()
+    result = supabase.table("projects").select("*").order("created_at", desc=True).execute()
     return result.data
 
 
@@ -205,8 +202,6 @@ def get_project(project_id: str, current_user: dict = Depends(get_current_user))
         raise HTTPException(status_code=404, detail="Project not found")
 
     project = project_result.data
-    if current_user["role"] != "admin" and project.get("superintendent_id") != current_user["id"]:
-        raise HTTPException(status_code=403, detail="Not authorized to view this project")
 
     logs_result = (
         supabase.table("logs")
@@ -276,7 +271,7 @@ def create_log(log: LogCreate, current_user: dict = Depends(get_current_user)):
 def update_log(log_id: str, body: LogUpdate, current_user: dict = Depends(get_current_user)):
     log_result = (
         supabase.table("logs")
-        .select("*, projects(superintendent_id)")
+        .select("*")
         .eq("id", log_id)
         .maybe_single()
         .execute()
@@ -284,9 +279,6 @@ def update_log(log_id: str, body: LogUpdate, current_user: dict = Depends(get_cu
     if not log_result.data:
         raise HTTPException(status_code=404, detail="Log not found")
     log = log_result.data
-    superintendent_id = (log.get("projects") or {}).get("superintendent_id")
-    if current_user["role"] != "admin" and current_user["id"] != superintendent_id:
-        raise HTTPException(status_code=403, detail="Not authorized to edit this log")
     updates = body.model_dump(exclude_unset=True)
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update")
@@ -301,7 +293,7 @@ def update_log(log_id: str, body: LogUpdate, current_user: dict = Depends(get_cu
 def delete_log(log_id: str, current_user: dict = Depends(get_current_user)):
     log_result = (
         supabase.table("logs")
-        .select("*, projects(superintendent_id)")
+        .select("*")
         .eq("id", log_id)
         .maybe_single()
         .execute()
@@ -309,9 +301,6 @@ def delete_log(log_id: str, current_user: dict = Depends(get_current_user)):
     if not log_result.data:
         raise HTTPException(status_code=404, detail="Log not found")
     log = log_result.data
-    superintendent_id = (log.get("projects") or {}).get("superintendent_id")
-    if current_user["role"] != "admin" and current_user["id"] != superintendent_id:
-        raise HTTPException(status_code=403, detail="Not authorized to delete this log")
     filenames = all_photo_filenames(log)
     if filenames:
         try:

@@ -4,103 +4,12 @@ import axios from 'axios';
 
 const API = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
-const styles = {
-  page: {
-    minHeight: '100vh',
-    background: '#f8fafc',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '20px',
-  },
-  card: {
-    background: '#fff',
-    borderRadius: 16,
-    border: '1px solid #e2e8f0',
-    padding: '40px 36px',
-    width: '100%',
-    maxWidth: 400,
-    boxShadow: '0 4px 24px rgba(0,0,0,0.07)',
-  },
-  logoRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 28,
-  },
-  logoIcon: {
-    width: 32,
-    height: 32,
-    background: '#3b82f6',
-    borderRadius: 8,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: 16,
-    fontWeight: 800,
-    color: '#fff',
-  },
-  logoText: {
-    fontSize: 20,
-    fontWeight: 700,
-    color: '#0f172a',
-  },
-  title: { fontSize: 22, fontWeight: 700, color: '#0f172a', marginBottom: 6 },
-  subtitle: { fontSize: 14, color: '#64748b', marginBottom: 28 },
-  fieldGroup: { marginBottom: 18 },
-  label: {
-    display: 'block',
-    fontSize: 13,
-    fontWeight: 600,
-    color: '#374151',
-    marginBottom: 6,
-  },
-  input: {
-    width: '100%',
-    border: '1px solid #d1d5db',
-    borderRadius: 8,
-    padding: '10px 14px',
-    fontSize: 15,
-    outline: 'none',
-    fontFamily: 'inherit',
-    color: '#0f172a',
-    background: '#fff',
-    boxSizing: 'border-box',
-    transition: 'border-color 0.15s',
-  },
-  submitBtn: {
-    width: '100%',
-    background: '#0f172a',
-    color: '#fff',
-    border: 'none',
-    borderRadius: 8,
-    padding: '13px',
-    fontSize: 15,
-    fontWeight: 600,
-    cursor: 'pointer',
-    marginTop: 8,
-    fontFamily: 'inherit',
-  },
-  error: {
-    background: '#fef2f2',
-    border: '1px solid #fecaca',
-    borderRadius: 8,
-    padding: '12px 16px',
-    color: '#dc2626',
-    fontSize: 14,
-    marginBottom: 20,
-  },
-};
-
 function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
-  const handleFocus = (e) => { e.target.style.borderColor = '#3b82f6'; };
-  const handleBlur = (e) => { e.target.style.borderColor = '#d1d5db'; };
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -118,56 +27,163 @@ function Login() {
   }
 
   return (
-    <div style={styles.page}>
-      <div style={styles.card}>
-        <div style={styles.logoRow}>
-          <div style={styles.logoIcon}>ST</div>
-          <span style={styles.logoText}>SiteTracker</span>
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #0f172a 100%)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '20px',
+    }}>
+      <div style={{
+        background: '#fff',
+        borderRadius: 20,
+        padding: '48px 44px',
+        width: '100%',
+        maxWidth: 420,
+        boxShadow: '0 24px 64px rgba(0,0,0,0.35)',
+      }}>
+        {/* Logo */}
+        <div style={{ textAlign: 'center', marginBottom: 36 }}>
+          <div style={{
+            width: 52,
+            height: 52,
+            background: '#0f172a',
+            borderRadius: 14,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 20,
+            fontWeight: 800,
+            color: '#fff',
+            margin: '0 auto 14px',
+            letterSpacing: '-0.5px',
+          }}>ST</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.5px' }}>
+            SiteTracker
+          </div>
+          <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
+            Construction progress management
+          </div>
         </div>
 
-        <h1 style={styles.title}>Sign in</h1>
-        <p style={styles.subtitle}>Enter your credentials to access your projects.</p>
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>
+            Sign in to your account
+          </div>
+        </div>
 
-        {error && <div style={styles.error}>{error}</div>}
+        {error && (
+          <div style={{
+            background: '#fef2f2',
+            border: '1px solid #fecaca',
+            borderRadius: 10,
+            padding: '12px 16px',
+            color: '#dc2626',
+            fontSize: 14,
+            marginBottom: 20,
+          }}>
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
-          <div style={styles.fieldGroup}>
-            <label style={styles.label}>Email</label>
+          <div style={{ marginBottom: 16 }}>
+            <label style={{
+              display: 'block',
+              fontSize: 13,
+              fontWeight: 600,
+              color: '#374151',
+              marginBottom: 6,
+            }}>Email address</label>
             <input
-              style={styles.input}
               type="email"
               placeholder="you@example.com"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              onFocus={handleFocus}
-              onBlur={handleBlur}
               required
               autoFocus
+              style={{
+                width: '100%',
+                border: '1.5px solid #e2e8f0',
+                borderRadius: 10,
+                padding: '11px 14px',
+                fontSize: 15,
+                outline: 'none',
+                fontFamily: 'inherit',
+                color: '#0f172a',
+                background: '#f8fafc',
+                boxSizing: 'border-box',
+                transition: 'border-color 0.15s, background 0.15s',
+              }}
+              onFocus={e => {
+                e.target.style.borderColor = '#3b82f6';
+                e.target.style.background = '#fff';
+              }}
+              onBlur={e => {
+                e.target.style.borderColor = '#e2e8f0';
+                e.target.style.background = '#f8fafc';
+              }}
             />
           </div>
 
-          <div style={styles.fieldGroup}>
-            <label style={styles.label}>Password</label>
+          <div style={{ marginBottom: 28 }}>
+            <label style={{
+              display: 'block',
+              fontSize: 13,
+              fontWeight: 600,
+              color: '#374151',
+              marginBottom: 6,
+            }}>Password</label>
             <input
-              style={styles.input}
               type="password"
               placeholder="••••••••"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              onFocus={handleFocus}
-              onBlur={handleBlur}
               required
+              style={{
+                width: '100%',
+                border: '1.5px solid #e2e8f0',
+                borderRadius: 10,
+                padding: '11px 14px',
+                fontSize: 15,
+                outline: 'none',
+                fontFamily: 'inherit',
+                color: '#0f172a',
+                background: '#f8fafc',
+                boxSizing: 'border-box',
+                transition: 'border-color 0.15s, background 0.15s',
+              }}
+              onFocus={e => {
+                e.target.style.borderColor = '#3b82f6';
+                e.target.style.background = '#fff';
+              }}
+              onBlur={e => {
+                e.target.style.borderColor = '#e2e8f0';
+                e.target.style.background = '#f8fafc';
+              }}
             />
           </div>
 
           <button
             type="submit"
-            style={{
-              ...styles.submitBtn,
-              background: loading ? '#94a3b8' : '#0f172a',
-              cursor: loading ? 'not-allowed' : 'pointer',
-            }}
             disabled={loading}
+            style={{
+              width: '100%',
+              background: loading ? '#64748b' : '#0f172a',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 10,
+              padding: '13px',
+              fontSize: 15,
+              fontWeight: 700,
+              cursor: loading ? 'not-allowed' : 'pointer',
+              fontFamily: 'inherit',
+              letterSpacing: '-0.2px',
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => { if (!loading) e.currentTarget.style.background = '#1e293b'; }}
+            onMouseLeave={e => { if (!loading) e.currentTarget.style.background = '#0f172a'; }}
           >
             {loading ? 'Signing in...' : 'Sign in'}
           </button>

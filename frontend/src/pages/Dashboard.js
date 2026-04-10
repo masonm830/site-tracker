@@ -6,206 +6,132 @@ import { getToken, isAdmin } from '../utils/auth';
 
 const API = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
-const styles = {
-  page: { minHeight: '100vh', background: '#f8fafc' },
-  main: { maxWidth: 1100, margin: '0 auto', padding: '32px 20px' },
+const COVER_COLORS = ['#1e3a5f', '#064e3b', '#4c1d95', '#7c2d12', '#134e4a', '#1e1b4b', '#3b0764'];
+
+function getInitials(name) {
+  return name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
+}
+function getCoverColor(name) {
+  return COVER_COLORS[name.charCodeAt(0) % COVER_COLORS.length];
+}
+function formatDate(iso) {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+const s = {
+  page: { minHeight: '100vh', background: '#f1f5f9' },
+  main: { maxWidth: 1200, margin: '0 auto', padding: '36px 24px' },
   topRow: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 28,
-    flexWrap: 'wrap',
-    gap: 12,
+    display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
+    marginBottom: 32, flexWrap: 'wrap', gap: 16,
   },
-  heading: { fontSize: 26, fontWeight: 700, color: '#0f172a', margin: 0 },
+  heading: { fontSize: 28, fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.5px' },
   subheading: { fontSize: 14, color: '#64748b', marginTop: 4 },
   newBtn: {
-    background: '#3b82f6',
-    color: '#fff',
-    border: 'none',
-    borderRadius: 8,
-    padding: '10px 20px',
-    fontSize: 15,
-    fontWeight: 600,
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-    whiteSpace: 'nowrap',
+    background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 10,
+    padding: '10px 20px', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+    display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
+    letterSpacing: '-0.2px',
   },
   grid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
     gap: 20,
   },
-  cardWrapper: { display: 'flex', flexDirection: 'column' },
+  // Card
   card: {
-    background: '#fff',
-    borderRadius: 12,
-    border: '1px solid #e2e8f0',
-    padding: '22px 24px',
-    cursor: 'pointer',
-    transition: 'box-shadow 0.15s, transform 0.15s',
-    textDecoration: 'none',
-    color: 'inherit',
-    display: 'block',
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    borderBottom: 'none',
+    background: '#fff', borderRadius: 16, overflow: 'hidden',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04)',
+    cursor: 'pointer', transition: 'box-shadow 0.2s, transform 0.2s',
+    position: 'relative',
   },
-  cardNoActions: {
-    background: '#fff',
-    borderRadius: 12,
-    border: '1px solid #e2e8f0',
-    padding: '22px 24px',
-    cursor: 'pointer',
-    transition: 'box-shadow 0.15s, transform 0.15s',
-    textDecoration: 'none',
-    color: 'inherit',
-    display: 'block',
+  cover: {
+    height: 110, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    position: 'relative', overflow: 'hidden',
   },
-  cardBadge: {
-    display: 'inline-block',
-    background: '#eff6ff',
-    color: '#2563eb',
-    borderRadius: 20,
-    padding: '2px 10px',
-    fontSize: 12,
-    fontWeight: 600,
-    marginBottom: 10,
+  initials: {
+    fontSize: 32, fontWeight: 800, color: 'rgba(255,255,255,0.9)', letterSpacing: '-1px',
   },
-  cardName: { fontSize: 18, fontWeight: 700, color: '#0f172a', marginBottom: 6 },
-  cardAddress: { fontSize: 14, color: '#64748b', marginBottom: 14, lineHeight: 1.4 },
-  cardFooter: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 14,
-    borderTop: '1px solid #f1f5f9',
-    fontSize: 13,
-    color: '#94a3b8',
+  coverOverlay: {
+    position: 'absolute', inset: 0,
+    background: 'linear-gradient(to bottom, rgba(0,0,0,0) 40%, rgba(0,0,0,0.25) 100%)',
   },
-  clientName: { fontWeight: 600, color: '#475569', fontSize: 13 },
-  cardActions: {
-    background: '#f8fafc',
-    border: '1px solid #e2e8f0',
-    borderTop: 'none',
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
-    padding: '8px 12px',
-    display: 'flex',
-    gap: 8,
-    alignItems: 'center',
+  adminBtns: {
+    position: 'absolute', top: 10, right: 10,
+    display: 'flex', gap: 6, zIndex: 2,
   },
-  editBtn: {
-    background: 'none',
-    border: '1px solid #cbd5e1',
-    borderRadius: 6,
-    padding: '4px 12px',
-    fontSize: 13,
-    cursor: 'pointer',
-    color: '#475569',
-    fontFamily: 'inherit',
-    fontWeight: 500,
+  iconBtn: {
+    width: 30, height: 30, borderRadius: 8,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    border: 'none', cursor: 'pointer', fontSize: 13,
+    background: 'rgba(15,23,42,0.55)', color: '#fff',
+    backdropFilter: 'blur(4px)',
+    transition: 'background 0.15s',
   },
-  deleteBtn: {
-    background: 'none',
-    border: '1px solid #fca5a5',
-    borderRadius: 6,
-    padding: '4px 12px',
-    fontSize: 13,
-    cursor: 'pointer',
-    color: '#dc2626',
-    fontFamily: 'inherit',
-    fontWeight: 500,
+  cardBody: { padding: '16px 20px 20px' },
+  cardName: { fontSize: 17, fontWeight: 700, color: '#0f172a', marginBottom: 4, lineHeight: 1.3, letterSpacing: '-0.2px' },
+  cardAddress: { fontSize: 13, color: '#64748b', marginBottom: 14, lineHeight: 1.5 },
+  cardMeta: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    paddingTop: 12, borderTop: '1px solid #f1f5f9',
   },
-  confirmText: { fontSize: 13, color: '#64748b' },
-  confirmYes: {
-    background: '#dc2626',
-    border: 'none',
-    borderRadius: 6,
-    padding: '4px 12px',
-    fontSize: 13,
-    cursor: 'pointer',
-    color: '#fff',
-    fontFamily: 'inherit',
-    fontWeight: 500,
+  clientPill: {
+    display: 'flex', alignItems: 'center', gap: 6,
   },
-  confirmNo: {
-    background: 'none',
-    border: '1px solid #cbd5e1',
-    borderRadius: 6,
-    padding: '4px 12px',
-    fontSize: 13,
-    cursor: 'pointer',
-    color: '#475569',
-    fontFamily: 'inherit',
+  clientAvatar: {
+    width: 22, height: 22, borderRadius: '50%', background: '#e2e8f0',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: 10, fontWeight: 700, color: '#475569', flexShrink: 0,
   },
-  editForm: {
-    background: '#fff',
-    border: '1px solid #3b82f6',
-    borderRadius: 12,
-    padding: '20px 24px',
+  clientName: { fontSize: 13, fontWeight: 600, color: '#475569' },
+  cardDate: { fontSize: 12, color: '#94a3b8' },
+  // Delete confirm strip
+  deleteStrip: {
+    borderTop: '1px solid #fecaca', padding: '10px 20px',
+    background: '#fef2f2', display: 'flex', alignItems: 'center', gap: 10,
   },
-  editFormTitle: { fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 14 },
+  deleteStripText: { fontSize: 13, color: '#dc2626', fontWeight: 500, flex: 1 },
+  deleteYes: {
+    background: '#dc2626', color: '#fff', border: 'none', borderRadius: 7,
+    padding: '5px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+  },
+  deleteNo: {
+    background: 'none', border: '1px solid #fca5a5', borderRadius: 7,
+    padding: '5px 14px', fontSize: 13, cursor: 'pointer', color: '#dc2626', fontFamily: 'inherit',
+  },
+  // Edit form
+  editCard: {
+    background: '#fff', borderRadius: 16, overflow: 'hidden',
+    boxShadow: '0 0 0 2px #3b82f6, 0 4px 16px rgba(59,130,246,0.15)',
+    padding: '24px',
+  },
+  editTitle: { fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 16 },
   fieldGroup: { marginBottom: 12 },
   label: { display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4 },
   input: {
-    width: '100%',
-    border: '1px solid #d1d5db',
-    borderRadius: 6,
-    padding: '8px 12px',
-    fontSize: 14,
-    fontFamily: 'inherit',
-    color: '#0f172a',
-    background: '#fff',
-    outline: 'none',
-    boxSizing: 'border-box',
+    width: '100%', border: '1.5px solid #e2e8f0', borderRadius: 8,
+    padding: '8px 12px', fontSize: 14, fontFamily: 'inherit',
+    color: '#0f172a', background: '#f8fafc', outline: 'none', boxSizing: 'border-box',
   },
-  editActions: { display: 'flex', gap: 8, marginTop: 14 },
+  editActions: { display: 'flex', gap: 8, marginTop: 16 },
   saveBtn: {
-    background: '#0f172a',
-    color: '#fff',
-    border: 'none',
-    borderRadius: 6,
-    padding: '8px 18px',
-    fontSize: 14,
-    fontWeight: 600,
-    cursor: 'pointer',
-    fontFamily: 'inherit',
+    background: '#0f172a', color: '#fff', border: 'none', borderRadius: 8,
+    padding: '9px 20px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
   },
   cancelBtn: {
-    background: 'none',
-    border: '1px solid #cbd5e1',
-    borderRadius: 6,
-    padding: '8px 18px',
-    fontSize: 14,
-    cursor: 'pointer',
-    color: '#475569',
-    fontFamily: 'inherit',
+    background: 'none', border: '1.5px solid #e2e8f0', borderRadius: 8,
+    padding: '9px 20px', fontSize: 14, cursor: 'pointer', color: '#475569', fontFamily: 'inherit',
   },
-  empty: {
-    textAlign: 'center',
-    padding: '80px 20px',
-    color: '#94a3b8',
-  },
-  emptyIcon: { fontSize: 48, marginBottom: 16 },
-  emptyTitle: { fontSize: 20, fontWeight: 600, color: '#475569', marginBottom: 8 },
+  // Empty
+  empty: { textAlign: 'center', padding: '80px 20px' },
+  emptyIcon: { fontSize: 52, marginBottom: 16 },
+  emptyTitle: { fontSize: 22, fontWeight: 700, color: '#1e293b', marginBottom: 8, letterSpacing: '-0.3px' },
+  emptyText: { fontSize: 15, color: '#64748b', marginBottom: 24 },
   error: {
-    background: '#fef2f2',
-    border: '1px solid #fecaca',
-    borderRadius: 8,
-    padding: '14px 18px',
-    color: '#dc2626',
-    marginBottom: 20,
+    background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10,
+    padding: '14px 18px', color: '#dc2626', marginBottom: 24,
   },
 };
-
-function formatDate(iso) {
-  return new Date(iso).toLocaleDateString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
-  });
-}
 
 function Dashboard() {
   const [projects, setProjects] = useState([]);
@@ -216,6 +142,7 @@ function Dashboard() {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
   const navigate = useNavigate();
+  const admin = isAdmin();
 
   useEffect(() => {
     axios.get(`${API}/api/projects`, {
@@ -230,11 +157,6 @@ function Dashboard() {
     setEditingProjectId(p.id);
     setEditForm({ name: p.name, address: p.address, client_name: p.client_name, client_email: p.client_email });
     setConfirmDeleteId(null);
-  }
-
-  function cancelEdit() {
-    setEditingProjectId(null);
-    setEditForm({});
   }
 
   async function handleEditSubmit(projectId) {
@@ -268,72 +190,87 @@ function Dashboard() {
     }
   }
 
-  const admin = isAdmin();
-
   return (
-    <div style={styles.page}>
+    <div style={s.page}>
       <Header right={
-        <button style={styles.newBtn} onClick={() => navigate('/projects/new')}>
+        <button
+          style={s.newBtn}
+          onClick={() => navigate('/projects/new')}
+          onMouseEnter={e => e.currentTarget.style.background = '#2563eb'}
+          onMouseLeave={e => e.currentTarget.style.background = '#3b82f6'}
+        >
           + New Project
         </button>
       } />
-      <main style={styles.main}>
-        <div style={styles.topRow}>
+
+      <main style={s.main}>
+        <div style={s.topRow}>
           <div>
-            <h1 style={styles.heading}>Projects</h1>
-            <p style={styles.subheading}>
-              {projects.length} active project{projects.length !== 1 ? 's' : ''}
+            <h1 style={s.heading}>Projects</h1>
+            <p style={s.subheading}>
+              {loading ? 'Loading...' : `${projects.length} active project${projects.length !== 1 ? 's' : ''}`}
             </p>
           </div>
         </div>
 
-        {error && <div style={styles.error}>{error}</div>}
+        {error && <div style={s.error}>{error}</div>}
 
         {loading ? (
-          <p style={{ color: '#94a3b8', textAlign: 'center', paddingTop: 60 }}>Loading projects...</p>
+          <p style={{ color: '#94a3b8', textAlign: 'center', paddingTop: 60, fontSize: 15 }}>
+            Loading projects...
+          </p>
         ) : projects.length === 0 && !error ? (
-          <div style={styles.empty}>
-            <div style={styles.emptyIcon}>🏗️</div>
-            <div style={styles.emptyTitle}>No projects yet</div>
-            <p>Create your first project to get started.</p>
-            <button style={styles.newBtn} onClick={() => navigate('/projects/new')}
+          <div style={s.empty}>
+            <div style={s.emptyIcon}>🏗️</div>
+            <div style={s.emptyTitle}>No projects yet</div>
+            <p style={s.emptyText}>Create your first project to start tracking progress.</p>
+            <button
+              style={s.newBtn}
+              onClick={() => navigate('/projects/new')}
               onMouseEnter={e => e.currentTarget.style.background = '#2563eb'}
-              onMouseLeave={e => e.currentTarget.style.background = '#3b82f6'}>
+              onMouseLeave={e => e.currentTarget.style.background = '#3b82f6'}
+            >
               + New Project
             </button>
           </div>
         ) : (
-          <div style={styles.grid}>
+          <div style={s.grid}>
             {projects.map(p => {
-              const isEditing = editingProjectId === p.id;
-              const isConfirmingDelete = confirmDeleteId === p.id;
-
-              if (isEditing) {
+              if (editingProjectId === p.id) {
                 return (
-                  <div key={p.id} style={styles.editForm}>
-                    <div style={styles.editFormTitle}>Edit Project</div>
-                    {['name', 'address', 'client_name', 'client_email'].map(field => (
-                      <div key={field} style={styles.fieldGroup}>
-                        <label style={styles.label}>
-                          {field === 'client_name' ? 'Client Name' : field === 'client_email' ? 'Client Email' : field.charAt(0).toUpperCase() + field.slice(1)}
-                        </label>
+                  <div key={p.id} style={s.editCard}>
+                    <div style={s.editTitle}>Edit Project</div>
+                    {[
+                      { field: 'name', label: 'Project Name' },
+                      { field: 'address', label: 'Site Address' },
+                      { field: 'client_name', label: 'Client Name' },
+                      { field: 'client_email', label: 'Client Email', type: 'email' },
+                    ].map(({ field, label, type }) => (
+                      <div key={field} style={s.fieldGroup}>
+                        <label style={s.label}>{label}</label>
                         <input
-                          style={styles.input}
-                          type={field === 'client_email' ? 'email' : 'text'}
+                          style={s.input}
+                          type={type || 'text'}
                           value={editForm[field] || ''}
                           onChange={e => setEditForm(f => ({ ...f, [field]: e.target.value }))}
+                          onFocus={e => { e.target.style.borderColor = '#3b82f6'; e.target.style.background = '#fff'; }}
+                          onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.background = '#f8fafc'; }}
                         />
                       </div>
                     ))}
-                    <div style={styles.editActions}>
+                    <div style={s.editActions}>
                       <button
-                        style={{ ...styles.saveBtn, opacity: actionLoading ? 0.6 : 1 }}
+                        style={{ ...s.saveBtn, opacity: actionLoading ? 0.6 : 1 }}
                         onClick={() => handleEditSubmit(p.id)}
                         disabled={actionLoading}
                       >
-                        {actionLoading ? 'Saving...' : 'Save'}
+                        {actionLoading ? 'Saving...' : 'Save Changes'}
                       </button>
-                      <button style={styles.cancelBtn} onClick={cancelEdit} disabled={actionLoading}>
+                      <button
+                        style={s.cancelBtn}
+                        onClick={() => { setEditingProjectId(null); setEditForm({}); }}
+                        disabled={actionLoading}
+                      >
                         Cancel
                       </button>
                     </div>
@@ -341,66 +278,89 @@ function Dashboard() {
                 );
               }
 
-              return (
-                <div key={p.id} style={styles.cardWrapper}>
-                  <a
-                    style={admin ? styles.card : styles.cardNoActions}
-                    href={`/projects/${p.id}`}
-                    onClick={e => { e.preventDefault(); navigate(`/projects/${p.id}`); }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.10)';
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.boxShadow = 'none';
-                      e.currentTarget.style.transform = 'none';
-                    }}
-                  >
-                    <span style={styles.cardBadge}>Active</span>
-                    <div style={styles.cardName}>{p.name}</div>
-                    <div style={styles.cardAddress}>{p.address}</div>
-                    <div style={styles.cardFooter}>
-                      <span style={styles.clientName}>{p.client_name}</span>
-                      <span>{formatDate(p.created_at)}</span>
-                    </div>
-                  </a>
+              const color = getCoverColor(p.name);
+              const initials = getInitials(p.name);
+              const isConfirmingDelete = confirmDeleteId === p.id;
 
+              return (
+                <div
+                  key={p.id}
+                  style={s.card}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.boxShadow = '0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04)';
+                    e.currentTarget.style.transform = 'none';
+                  }}
+                >
+                  {/* Cover area */}
+                  <div style={{ ...s.cover, background: `linear-gradient(135deg, ${color} 0%, ${color}cc 100%)` }}>
+                    <div style={s.coverOverlay} />
+                    <span style={s.initials}>{initials}</span>
+                  </div>
+
+                  {/* Admin icon buttons */}
                   {admin && (
-                    <div style={styles.cardActions}>
-                      {isConfirmingDelete ? (
-                        <>
-                          <span style={styles.confirmText}>Delete this project?</span>
-                          <button
-                            style={{ ...styles.confirmYes, opacity: actionLoading ? 0.6 : 1 }}
-                            onClick={e => { e.stopPropagation(); handleDeleteProject(p.id); }}
-                            disabled={actionLoading}
-                          >
-                            {actionLoading ? '...' : 'Delete'}
-                          </button>
-                          <button
-                            style={styles.confirmNo}
-                            onClick={e => { e.stopPropagation(); setConfirmDeleteId(null); }}
-                            disabled={actionLoading}
-                          >
-                            Cancel
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            style={styles.editBtn}
-                            onClick={e => { e.stopPropagation(); startEdit(p); }}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            style={styles.deleteBtn}
-                            onClick={e => { e.stopPropagation(); setConfirmDeleteId(p.id); setEditingProjectId(null); }}
-                          >
-                            Delete
-                          </button>
-                        </>
-                      )}
+                    <div style={s.adminBtns}>
+                      <button
+                        style={s.iconBtn}
+                        title="Edit project"
+                        onClick={e => { e.stopPropagation(); startEdit(p); }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(15,23,42,0.8)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(15,23,42,0.55)'}
+                      >
+                        ✏
+                      </button>
+                      <button
+                        style={s.iconBtn}
+                        title="Delete project"
+                        onClick={e => { e.stopPropagation(); setConfirmDeleteId(p.id); setEditingProjectId(null); }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(220,38,38,0.8)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(15,23,42,0.55)'}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Clickable body */}
+                  <div
+                    style={s.cardBody}
+                    onClick={() => navigate(`/projects/${p.id}`)}
+                  >
+                    <div style={s.cardName}>{p.name}</div>
+                    <div style={s.cardAddress}>{p.address}</div>
+                    <div style={s.cardMeta}>
+                      <div style={s.clientPill}>
+                        <div style={s.clientAvatar}>
+                          {p.client_name.charAt(0).toUpperCase()}
+                        </div>
+                        <span style={s.clientName}>{p.client_name}</span>
+                      </div>
+                      <span style={s.cardDate}>{formatDate(p.created_at)}</span>
+                    </div>
+                  </div>
+
+                  {/* Inline delete confirmation */}
+                  {isConfirmingDelete && (
+                    <div style={s.deleteStrip}>
+                      <span style={s.deleteStripText}>Delete this project and all its data?</span>
+                      <button
+                        style={{ ...s.deleteNo }}
+                        onClick={e => { e.stopPropagation(); setConfirmDeleteId(null); }}
+                        disabled={actionLoading}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        style={{ ...s.deleteYes, opacity: actionLoading ? 0.6 : 1 }}
+                        onClick={e => { e.stopPropagation(); handleDeleteProject(p.id); }}
+                        disabled={actionLoading}
+                      >
+                        {actionLoading ? '...' : 'Delete'}
+                      </button>
                     </div>
                   )}
                 </div>

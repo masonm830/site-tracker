@@ -5,6 +5,9 @@ import ProjectDetail from './pages/ProjectDetail';
 import ClientShare from './pages/ClientShare';
 import Login from './pages/Login';
 import ProtectedRoute from './components/ProtectedRoute';
+import { setupAxiosInterceptors } from './utils/auth';
+
+setupAxiosInterceptors();
 
 function App() {
   return (

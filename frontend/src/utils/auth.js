@@ -1,3 +1,5 @@
+import axios from 'axios';
+
 export const getToken = () => sessionStorage.getItem('token');
 
 export const getUser = () => {
@@ -14,4 +16,16 @@ export const logout = () => {
 export const isAdmin = () => {
   const user = getUser();
   return user?.role === 'admin';
+};
+
+export const setupAxiosInterceptors = () => {
+  axios.interceptors.response.use(
+    response => response,
+    error => {
+      if (error.response?.status === 401) {
+        logout();
+      }
+      return Promise.reject(error);
+    }
+  );
 };

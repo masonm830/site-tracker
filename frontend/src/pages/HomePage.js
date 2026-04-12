@@ -30,6 +30,134 @@ const CARDS = [
   },
 ];
 
+// --- Weather Widget ---
+
+function getWeatherTheme(code) {
+  if (code === 0)  return { accent: '#f59e0b', bg: '#fffbeb', icon: '☀️' };
+  if (code <= 3)   return { accent: '#94a3b8', bg: '#f8fafc', icon: '⛅' };
+  if (code <= 48)  return { accent: '#64748b', bg: '#f1f5f9', icon: '🌫️' };
+  if (code <= 67)  return { accent: '#3b82f6', bg: '#eff6ff', icon: '🌧️' };
+  if (code <= 77)  return { accent: '#0ea5e9', bg: '#f0f9ff', icon: '❄️' };
+  if (code <= 82)  return { accent: '#3b82f6', bg: '#eff6ff', icon: '🌦️' };
+  return           { accent: '#7c3aed', bg: '#f5f3ff', icon: '⛈️' };
+}
+
+function WeatherWidget() {
+  const [weather, setWeather] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+
+  function fetchWeather() {
+    axios.get(`${API}/api/weather`)
+      .then(res => setWeather(res.data))
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+  }
+
+  useEffect(() => {
+    fetchWeather();
+    const id = setInterval(fetchWeather, 30 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const theme = weather
+    ? getWeatherTheme(weather.current.weather_code)
+    : { accent: '#64748b', bg: '#f8fafc', icon: '🌡️' };
+
+  return (
+    <div style={{
+      width: 280,
+      flexShrink: 0,
+      background: '#fff',
+      borderRadius: 16,
+      boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04)',
+      overflow: 'hidden',
+      alignSelf: 'flex-start',
+    }}>
+      <div style={{
+        padding: '14px 18px 10px',
+        borderBottom: '1px solid #f1f5f9',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          Phoenix Weather
+        </span>
+        <span style={{ fontSize: 18 }}>{theme.icon}</span>
+      </div>
+
+      <div style={{ padding: '18px 18px 16px', minHeight: 320 }}>
+        {!loaded ? (
+          <p style={{ fontSize: 13, color: '#94a3b8', margin: 0 }}>Loading…</p>
+        ) : !weather ? (
+          <p style={{ fontSize: 13, color: '#94a3b8', margin: 0 }}>Weather unavailable</p>
+        ) : (
+          <>
+            {/* Current conditions */}
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, marginBottom: 6 }}>
+                <span style={{
+                  fontSize: 56,
+                  fontWeight: 800,
+                  color: theme.accent,
+                  lineHeight: 1,
+                  letterSpacing: '-2px',
+                }}>
+                  {weather.current.temp}°
+                </span>
+                <span style={{ fontSize: 16, color: '#94a3b8', fontWeight: 600, paddingBottom: 10 }}>F</span>
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', marginBottom: 10 }}>
+                {weather.current.description}
+              </div>
+              <div style={{ display: 'flex', gap: 16 }}>
+                <span style={{ fontSize: 12, color: '#64748b' }}>
+                  <span style={{ fontWeight: 700, color: '#374151' }}>{weather.current.humidity}%</span> humidity
+                </span>
+                <span style={{ fontSize: 12, color: '#64748b' }}>
+                  <span style={{ fontWeight: 700, color: '#374151' }}>{weather.current.wind_speed} mph</span> wind
+                </span>
+              </div>
+            </div>
+
+            <div style={{ borderTop: '1px solid #f1f5f9', marginBottom: 14 }} />
+
+            {/* 3-day forecast */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {weather.forecast.map((day, i) => {
+                const dt = getWeatherTheme(day.weather_code);
+                return (
+                  <div key={i} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    background: i === 0 ? dt.bg : 'transparent',
+                    gap: 8,
+                  }}>
+                    <span style={{ fontSize: 14, marginRight: 2 }}>{dt.icon}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#374151', width: 70, flexShrink: 0 }}>
+                      {day.day}
+                    </span>
+                    <span style={{ fontSize: 11, color: '#94a3b8', flex: 1, textAlign: 'center', lineHeight: 1.3 }}>
+                      {day.description}
+                    </span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', whiteSpace: 'nowrap' }}>
+                      {day.high}° / <span style={{ fontWeight: 400, color: '#94a3b8' }}>{day.low}°</span>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// --- Today's Activity Banner ---
+
 const CATEGORIES = [
   { type: 'progress', label: 'Daily Logs',     icon: '📋', color: '#3b82f6', bg: '#eff6ff' },
   { type: 'trade',   label: 'Trade Activity',  icon: '🔧', color: '#f59e0b', bg: '#fffbeb' },
@@ -309,10 +437,13 @@ function HomePage() {
           </p>
         </div>
 
-        {/* Two-column layout */}
-        <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
-          {/* Left: stats + cards */}
-          <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Three-column layout — wraps to vertical stack on narrow screens */}
+        <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          {/* Left: Weather */}
+          <WeatherWidget />
+
+          {/* Center: stats + tool cards */}
+          <div style={{ flex: 1, minWidth: 280 }}>
             {/* Stats row */}
             <div style={{ display: 'flex', gap: 12, marginBottom: 28 }}>
               <StatPill label="Active Projects" value={stats.projects} color="#3b82f6" />

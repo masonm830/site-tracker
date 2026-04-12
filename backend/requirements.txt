@@ -3,3 +3,5 @@ uvicorn
 python-dotenv
 supabase
 python-multipart
+sib-api-v3-sdk
+apscheduler

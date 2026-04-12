@@ -1,17 +1,29 @@
 import os
 import uuid
-from datetime import datetime, timezone
+import json
+import urllib.request
+from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 from fastapi import FastAPI, HTTPException, UploadFile, File, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from supabase import create_client, Client
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
+import sib_api_v3_sdk
+from sib_api_v3_sdk.rest import ApiException
 
 load_dotenv()
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
+BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
+BREVO_FROM_EMAIL = os.getenv("FROM_EMAIL", "")
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "")
+
+PHOENIX_TZ = ZoneInfo("America/Phoenix")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
@@ -584,3 +596,362 @@ async def upload_photo(
 
     public_url = supabase.storage.from_("site-photos").get_public_url(filename)
     return {"url": public_url}
+
+
+# --- Weather ---
+
+WEATHER_URL = (
+    "https://api.open-meteo.com/v1/forecast"
+    "?latitude=33.4484&longitude=-112.0740"
+    "&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code"
+    "&daily=weather_code,temperature_2m_max,temperature_2m_min"
+    "&temperature_unit=fahrenheit&wind_speed_unit=mph"
+    "&forecast_days=3&timezone=America%2FPhoenix"
+)
+
+
+def _weather_description(code: int) -> str:
+    if code == 0:
+        return "Clear sky"
+    if code <= 3:
+        return "Partly cloudy"
+    if code <= 48:
+        return "Foggy"
+    if code <= 67:
+        return "Drizzle / Rain"
+    if code <= 77:
+        return "Snow"
+    if code <= 82:
+        return "Rain showers"
+    return "Thunderstorm"
+
+
+@app.get("/api/weather")
+def get_weather():
+    try:
+        with urllib.request.urlopen(WEATHER_URL, timeout=10) as resp:
+            data = json.loads(resp.read())
+    except Exception as e:
+        print(f"[get_weather] Error: {e}")
+        raise HTTPException(status_code=503, detail="Weather service unavailable")
+
+    current = data["current"]
+    daily = data["daily"]
+    code = int(current["weather_code"])
+
+    forecast = []
+    for i in range(3):
+        day_date = daily["time"][i]
+        day_dt = datetime.strptime(day_date, "%Y-%m-%d")
+        if i == 0:
+            day_label = "Today"
+        elif i == 1:
+            day_label = "Tomorrow"
+        else:
+            day_label = day_dt.strftime("%A")
+        forecast.append({
+            "date": day_date,
+            "day": day_label,
+            "high": round(daily["temperature_2m_max"][i]),
+            "low": round(daily["temperature_2m_min"][i]),
+            "weather_code": int(daily["weather_code"][i]),
+            "description": _weather_description(int(daily["weather_code"][i])),
+        })
+
+    return {
+        "current": {
+            "temp": round(current["temperature_2m"]),
+            "humidity": int(current["relative_humidity_2m"]),
+            "wind_speed": round(current["wind_speed_10m"]),
+            "weather_code": code,
+            "description": _weather_description(code),
+        },
+        "forecast": forecast,
+    }
+
+
+# --- Email helpers ---
+
+def _day_range_utc(date_az: datetime):
+    """Return UTC ISO strings for start and end of a Phoenix-timezone day."""
+    start = datetime(date_az.year, date_az.month, date_az.day, 0, 0, 0, tzinfo=PHOENIX_TZ)
+    end = datetime(date_az.year, date_az.month, date_az.day, 23, 59, 59, tzinfo=PHOENIX_TZ)
+    return start.astimezone(timezone.utc).isoformat(), end.astimezone(timezone.utc).isoformat()
+
+
+def _send_email(to_email: str, subject: str, html: str, reply_to: str | None = None):
+    if not BREVO_API_KEY or not BREVO_FROM_EMAIL:
+        print(f"[email] Brevo not configured — skipping email to {to_email}")
+        return
+    configuration = sib_api_v3_sdk.Configuration()
+    configuration.api_key["api-key"] = BREVO_API_KEY
+    api = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
+    send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+        sender={"email": BREVO_FROM_EMAIL},
+        to=[{"email": to_email}],
+        reply_to={"email": reply_to} if reply_to else None,
+        subject=subject,
+        html_content=html,
+    )
+    try:
+        api.send_transac_email(send_smtp_email)
+        print(f"[email] Sent '{subject}' to {to_email}")
+    except ApiException as e:
+        print(f"[email] Brevo error: {e}")
+
+
+def _build_daily_report_html(date_str: str, progress_logs, trade_logs, punch_items, project_map: dict) -> str:
+    def proj(pid): return project_map.get(pid, {}).get("name", "Unknown Project")
+
+    def section(title, color, rows_html):
+        return f"""
+        <div style="margin-bottom:28px;">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;
+                      color:{color};border-left:3px solid {color};padding-left:10px;margin-bottom:12px;">
+            {title}
+          </div>
+          {rows_html if rows_html else '<p style="font-size:13px;color:#94a3b8;margin:0;">No activity today.</p>'}
+        </div>"""
+
+    def log_row(note, project, extra=""):
+        return f"""
+        <div style="padding:10px 0;border-bottom:1px solid #f1f5f9;">
+          <div style="font-size:13px;font-weight:600;color:#1e293b;margin-bottom:2px;">{project}</div>
+          <div style="font-size:13px;color:#374151;line-height:1.5;">{note}</div>
+          {f'<div style="font-size:11px;color:#94a3b8;margin-top:4px;">{extra}</div>' if extra else ""}
+        </div>"""
+
+    progress_rows = "".join(
+        log_row(l.get("note", "—"), proj(l["project_id"]),
+                f'{len(l.get("photo_urls") or [])} photo(s)' if l.get("photo_urls") else "")
+        for l in progress_logs
+    )
+    trade_rows = "".join(
+        log_row(
+            f'<b>{l["trade_company"]}</b>: {l["work_description"]}',
+            proj(l["project_id"]),
+            "⚠️ Issue logged" if l.get("is_issue") else ""
+        )
+        for l in trade_logs
+    )
+    punch_rows = "".join(
+        log_row(l["description"], proj(l["project_id"]),
+                f'Status: {l.get("status","open").replace("_"," ").title()}')
+        for l in punch_items
+    )
+
+    return f"""<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:20px;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;
+              box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+    <div style="background:#0f172a;padding:24px 32px;">
+      <div style="font-size:22px;font-weight:800;color:#fff;letter-spacing:-0.5px;">SiteTracker</div>
+      <div style="font-size:13px;color:#94a3b8;margin-top:4px;">Daily Report — {date_str}</div>
+    </div>
+    <div style="padding:16px 32px;background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="text-align:center;padding:8px;">
+            <div style="font-size:28px;font-weight:800;color:#3b82f6;">{len(progress_logs)}</div>
+            <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;">Progress Logs</div>
+          </td>
+          <td style="text-align:center;padding:8px;">
+            <div style="font-size:28px;font-weight:800;color:#f59e0b;">{len(trade_logs)}</div>
+            <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;">Trade Logs</div>
+          </td>
+          <td style="text-align:center;padding:8px;">
+            <div style="font-size:28px;font-weight:800;color:#10b981;">{len(punch_items)}</div>
+            <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;">Punch Items</div>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <div style="padding:28px 32px;">
+      {section("Daily Logs", "#3b82f6", progress_rows)}
+      {section("Trade Activity", "#f59e0b", trade_rows)}
+      {section("Punch List", "#10b981", punch_rows)}
+    </div>
+    <div style="padding:16px 32px;background:#f8fafc;border-top:1px solid #e2e8f0;
+                font-size:11px;color:#94a3b8;text-align:center;">
+      SiteTracker — generated {date_str}
+    </div>
+  </div>
+</body>
+</html>"""
+
+
+def _build_client_email_html(project: dict, logs: list, share_url: str, week_of: str) -> str:
+    log_rows = "".join(f"""
+      <div style="padding:12px 0;border-bottom:1px solid #f1f5f9;">
+        <div style="font-size:11px;color:#94a3b8;margin-bottom:4px;">
+          {datetime.fromisoformat(l['created_at'].replace('Z','+00:00')).astimezone(PHOENIX_TZ).strftime('%b %d, %Y')}
+        </div>
+        <div style="font-size:14px;color:#374151;line-height:1.5;">{l.get('note','—')}</div>
+      </div>""" for l in logs)
+
+    return f"""<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:20px;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;
+              box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+    <div style="background:#0f172a;padding:24px 32px;">
+      <div style="font-size:22px;font-weight:800;color:#fff;letter-spacing:-0.5px;">SiteTracker</div>
+      <div style="font-size:13px;color:#94a3b8;margin-top:4px;">Weekly Project Update</div>
+    </div>
+    <div style="padding:28px 32px 8px;">
+      <div style="font-size:22px;font-weight:800;color:#0f172a;margin-bottom:6px;letter-spacing:-0.4px;">
+        {project['name']}
+      </div>
+      <div style="font-size:14px;color:#64748b;margin-bottom:20px;">{project.get('address','')}</div>
+      <p style="font-size:15px;color:#374151;line-height:1.6;margin:0 0 20px;">
+        Hi {project.get('client_name','there')}, here's your jobsite update for the week of <b>{week_of}</b>.
+        Your project had <b>{len(logs)} update{'' if len(logs)==1 else 's'}</b> this week.
+      </p>
+    </div>
+    <div style="padding:0 32px 24px;">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;
+                  color:#3b82f6;border-left:3px solid #3b82f6;padding-left:10px;margin-bottom:12px;">
+        This Week's Updates
+      </div>
+      {log_rows}
+    </div>
+    <div style="padding:24px 32px;text-align:center;background:#f8fafc;border-top:1px solid #e2e8f0;">
+      <p style="font-size:13px;color:#64748b;margin:0 0 16px;">
+        View the full photo progress log for your project:
+      </p>
+      <a href="{share_url}"
+         style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;
+                font-size:14px;font-weight:700;padding:13px 28px;border-radius:10px;
+                letter-spacing:-0.2px;">
+        View Project Progress →
+      </a>
+    </div>
+    <div style="padding:16px 32px;font-size:11px;color:#94a3b8;text-align:center;">
+      SiteTracker — Week of {week_of}
+    </div>
+  </div>
+</body>
+</html>"""
+
+
+# --- Scheduled jobs ---
+
+def send_daily_report():
+    print("[scheduler] Running daily report...")
+    now_az = datetime.now(PHOENIX_TZ)
+    date_str = now_az.strftime("%B %d, %Y")
+    day_start, day_end = _day_range_utc(now_az)
+
+    try:
+        projects = supabase.table("projects").select("*").execute().data
+        project_map = {p["id"]: p for p in projects}
+
+        progress_logs = (
+            supabase.table("logs").select("*")
+            .gte("created_at", day_start).lte("created_at", day_end)
+            .order("created_at").execute().data
+        )
+        trade_logs = (
+            supabase.table("trade_logs").select("*")
+            .gte("created_at", day_start).lte("created_at", day_end)
+            .order("created_at").execute().data
+        )
+        punch_items = (
+            supabase.table("punch_list_items").select("*")
+            .gte("created_at", day_start).lte("created_at", day_end)
+            .order("created_at").execute().data
+        )
+    except Exception as e:
+        print(f"[scheduler] DB error in daily report: {e}")
+        return
+
+    if not progress_logs and not trade_logs and not punch_items:
+        print("[scheduler] No activity today — skipping daily report email")
+        return
+
+    html = _build_daily_report_html(date_str, progress_logs, trade_logs, punch_items, project_map)
+    _send_email(
+        to_email=ADMIN_EMAIL,
+        subject=f"SiteTracker Daily Report — {date_str}",
+        html=html,
+        reply_to=BREVO_FROM_EMAIL,
+    )
+
+
+def send_weekly_emails():
+    print("[scheduler] Running weekly client emails...")
+    now_az = datetime.now(PHOENIX_TZ)
+    week_ago = now_az - timedelta(days=7)
+    week_start = datetime(week_ago.year, week_ago.month, week_ago.day, 0, 0, 0, tzinfo=PHOENIX_TZ).astimezone(timezone.utc).isoformat()
+    week_of = week_ago.strftime("%B %d, %Y")
+
+    try:
+        projects = supabase.table("projects").select("*").execute().data
+    except Exception as e:
+        print(f"[scheduler] DB error fetching projects: {e}")
+        return
+
+    for project in projects:
+        if not project.get("client_email"):
+            continue
+        try:
+            logs = (
+                supabase.table("logs").select("*")
+                .eq("project_id", project["id"])
+                .gte("created_at", week_start)
+                .order("created_at")
+                .execute().data
+            )
+        except Exception as e:
+            print(f"[scheduler] DB error fetching logs for {project['name']}: {e}")
+            continue
+
+        if not logs:
+            continue
+
+        share_url = f"https://site-tracker-five.vercel.app/share/{project['share_token']}"
+        html = _build_client_email_html(project, logs, share_url, week_of)
+        _send_email(
+            to_email=project["client_email"],
+            subject=f"{project['name']} Weekly Progress — Week of {week_of}",
+            html=html,
+            reply_to=ADMIN_EMAIL,
+        )
+
+
+# --- Scheduler lifecycle ---
+
+scheduler = BackgroundScheduler(timezone="America/Phoenix")
+scheduler.add_job(send_daily_report, CronTrigger(hour=18, minute=0, timezone="America/Phoenix"))
+scheduler.add_job(send_weekly_emails, CronTrigger(day_of_week="fri", hour=17, minute=0, timezone="America/Phoenix"))
+
+
+@app.on_event("startup")
+def start_scheduler():
+    scheduler.start()
+    print("[scheduler] Started — daily report at 6 PM, weekly emails Friday at 5 PM (Arizona time)")
+
+
+@app.on_event("shutdown")
+def stop_scheduler():
+    if scheduler.running:
+        scheduler.shutdown()
+
+
+# --- Manual trigger endpoints ---
+
+@app.post("/api/send-daily-report")
+def trigger_daily_report(current_user: dict = Depends(get_current_user)):
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    send_daily_report()
+    return {"message": "Daily report sent"}
+
+
+@app.post("/api/send-weekly-emails")
+def trigger_weekly_emails(current_user: dict = Depends(get_current_user)):
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    send_weekly_emails()
+    return {"message": "Weekly emails sent"}

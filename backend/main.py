@@ -53,6 +53,7 @@ class ProjectCreate(BaseModel):
     address: str
     client_name: str
     client_email: str
+    weekly_email_enabled: bool = True
 
 
 class LogCreate(BaseModel):
@@ -66,6 +67,7 @@ class ProjectUpdate(BaseModel):
     address: str | None = None
     client_name: str | None = None
     client_email: str | None = None
+    weekly_email_enabled: bool | None = None
 
 
 class LogUpdate(BaseModel):
@@ -894,6 +896,8 @@ def send_weekly_emails():
 
     for project in projects:
         if not project.get("client_email"):
+            continue
+        if not project.get("weekly_email_enabled", True):
             continue
         try:
             logs = (

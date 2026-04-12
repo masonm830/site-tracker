@@ -88,9 +88,28 @@ const styles = {
   },
 };
 
+function Toggle({ checked, onChange }) {
+  return (
+    <div
+      onClick={() => onChange(!checked)}
+      style={{
+        width: 44, height: 24, borderRadius: 12, flexShrink: 0,
+        background: checked ? '#3b82f6' : '#cbd5e1',
+        position: 'relative', cursor: 'pointer', transition: 'background 0.2s',
+      }}
+    >
+      <div style={{
+        position: 'absolute', top: 3, left: checked ? 22 : 3,
+        width: 18, height: 18, borderRadius: '50%', background: '#fff',
+        transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+      }} />
+    </div>
+  );
+}
+
 function NewProject() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name: '', address: '', client_name: '', client_email: '' });
+  const [form, setForm] = useState({ name: '', address: '', client_name: '', client_email: '', weekly_email_enabled: true });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -188,6 +207,18 @@ function NewProject() {
                 onFocus={handleFocus}
                 onBlur={handleBlur}
                 required
+              />
+            </div>
+
+            <div style={{ ...styles.divider, marginTop: 20 }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>Send weekly progress emails to client</div>
+                <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>Automated Friday update sent to client email</div>
+              </div>
+              <Toggle
+                checked={form.weekly_email_enabled}
+                onChange={val => setForm(f => ({ ...f, weekly_email_enabled: val }))}
               />
             </div>
 

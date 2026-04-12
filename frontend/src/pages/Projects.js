@@ -23,6 +23,25 @@ function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function Toggle({ checked, onChange }) {
+  return (
+    <div
+      onClick={() => onChange(!checked)}
+      style={{
+        width: 44, height: 24, borderRadius: 12, flexShrink: 0,
+        background: checked ? '#3b82f6' : '#cbd5e1',
+        position: 'relative', cursor: 'pointer', transition: 'background 0.2s',
+      }}
+    >
+      <div style={{
+        position: 'absolute', top: 3, left: checked ? 22 : 3,
+        width: 18, height: 18, borderRadius: '50%', background: '#fff',
+        transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+      }} />
+    </div>
+  );
+}
+
 function Projects() {
   const navigate = useNavigate();
 
@@ -58,7 +77,7 @@ function Projects() {
 
   function startEdit(p) {
     setEditingId(p.id);
-    setEditForm({ name: p.name, address: p.address, client_name: p.client_name, client_email: p.client_email });
+    setEditForm({ name: p.name, address: p.address, client_name: p.client_name, client_email: p.client_email, weekly_email_enabled: p.weekly_email_enabled !== false });
     setConfirmDeleteId(null);
   }
 
@@ -179,6 +198,16 @@ function Projects() {
                         <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#374151', marginBottom: 3 }}>Client Email</label>
                         <input style={inp} type="email" value={editForm.client_email || ''} onChange={e => setEditForm(f => ({ ...f, client_email: e.target.value }))} />
                       </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderTop: '1px solid #e2e8f0', marginTop: 4, marginBottom: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>Send weekly progress emails to client</div>
+                        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>Automated Friday update sent to client email</div>
+                      </div>
+                      <Toggle
+                        checked={editForm.weekly_email_enabled !== false}
+                        onChange={val => setEditForm(f => ({ ...f, weekly_email_enabled: val }))}
+                      />
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button

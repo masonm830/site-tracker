@@ -179,6 +179,25 @@ function formatDateTime(iso) {
   });
 }
 
+function Toggle({ checked, onChange }) {
+  return (
+    <div
+      onClick={() => onChange(!checked)}
+      style={{
+        width: 44, height: 24, borderRadius: 12, flexShrink: 0,
+        background: checked ? '#3b82f6' : '#cbd5e1',
+        position: 'relative', cursor: 'pointer', transition: 'background 0.2s',
+      }}
+    >
+      <div style={{
+        position: 'absolute', top: 3, left: checked ? 22 : 3,
+        width: 18, height: 18, borderRadius: '50%', background: '#fff',
+        transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+      }} />
+    </div>
+  );
+}
+
 function ProjectDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -264,7 +283,7 @@ function ProjectDetail() {
   }
 
   function startEditProject() {
-    setProjectForm({ name: project.name, address: project.address, client_name: project.client_name, client_email: project.client_email });
+    setProjectForm({ name: project.name, address: project.address, client_name: project.client_name, client_email: project.client_email, weekly_email_enabled: project.weekly_email_enabled !== false });
     setEditingProject(true);
   }
 
@@ -417,6 +436,16 @@ function ProjectDetail() {
                   <input style={s.input} type="email" value={projectForm.client_email || ''} onChange={e => setProjectForm(f => ({ ...f, client_email: e.target.value }))} onFocus={e => e.target.style.borderColor = '#3b82f6'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
                 </div>
               </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderTop: '1px solid #e2e8f0', marginBottom: 12 }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>Send weekly progress emails to client</div>
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>Automated Friday update sent to client email</div>
+                </div>
+                <Toggle
+                  checked={projectForm.weekly_email_enabled !== false}
+                  onChange={val => setProjectForm(f => ({ ...f, weekly_email_enabled: val }))}
+                />
+              </div>
               <div style={s.inlineActions}>
                 <button style={{ ...s.saveBtn, opacity: projectEditLoading ? 0.6 : 1 }} onClick={handleEditProjectSubmit} disabled={projectEditLoading}>
                   {projectEditLoading ? 'Saving...' : 'Save Changes'}
@@ -439,6 +468,22 @@ function ProjectDetail() {
               <span style={s.metaLabel}>Updates</span>
               <span style={s.metaValue}>{logs.length}</span>
             </div>
+            {admin && (
+              <div style={s.metaItem}>
+                <span style={s.metaLabel}>Weekly Emails</span>
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  fontSize: 12, fontWeight: 700,
+                  color: project.weekly_email_enabled !== false ? '#15803d' : '#94a3b8',
+                  background: project.weekly_email_enabled !== false ? '#f0fdf4' : '#f8fafc',
+                  border: `1px solid ${project.weekly_email_enabled !== false ? '#bbf7d0' : '#e2e8f0'}`,
+                  borderRadius: 6, padding: '3px 8px', marginTop: 2,
+                }}>
+                  <span style={{ fontSize: 8 }}>●</span>
+                  {project.weekly_email_enabled !== false ? 'Enabled' : 'Disabled'}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 

@@ -454,11 +454,10 @@ function PunchList() {
                         <p style={{
                           fontSize: 15,
                           fontWeight: 600,
-                          color: '#0f172a',
+                          color: isCompleted ? '#94a3b8' : '#0f172a',
                           margin: '0 0 6px',
                           lineHeight: 1.4,
                           textDecoration: isCompleted ? 'line-through' : 'none',
-                          color: isCompleted ? '#94a3b8' : '#0f172a',
                         }}>
                           {item.description}
                         </p>

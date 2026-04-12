@@ -1,8 +1,25 @@
-import { getUser, logout } from '../utils/auth';
+import { useLocation } from 'react-router-dom';
+import { getUser, logout, isAdmin } from '../utils/auth';
+
+const BASE_NAV = [
+  { label: 'Home', path: '/' },
+  { label: 'Daily Logs', path: '/progress' },
+  { label: 'Trades', path: '/trades' },
+  { label: 'Punch List', path: '/punchlist' },
+];
+const ADMIN_NAV = [
+  { label: 'Home', path: '/' },
+  { label: 'Daily Logs', path: '/progress' },
+  { label: 'Trades', path: '/trades' },
+  { label: 'Punch List', path: '/punchlist' },
+  { label: 'Projects', path: '/projects' },
+];
 
 function Header({ right }) {
   const user = getUser();
-  const isAdmin = user?.role === 'admin';
+  const admin = isAdmin();
+  const location = useLocation();
+  const NAV_LINKS = admin ? ADMIN_NAV : BASE_NAV;
 
   return (
     <header style={{
@@ -18,31 +35,73 @@ function Header({ right }) {
       zIndex: 100,
       boxShadow: '0 1px 0 rgba(255,255,255,0.06)',
     }}>
-      <a href="/" style={{
-        fontSize: 18,
-        fontWeight: 700,
-        letterSpacing: '-0.4px',
-        color: '#fff',
-        textDecoration: 'none',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-      }}>
-        <span style={{
-          width: 30,
-          height: 30,
-          background: '#3b82f6',
-          borderRadius: 7,
+      <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
+        <a href="/" style={{
+          fontSize: 18,
+          fontWeight: 700,
+          letterSpacing: '-0.4px',
+          color: '#fff',
+          textDecoration: 'none',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 13,
-          fontWeight: 800,
-          letterSpacing: '-0.5px',
+          gap: 10,
           flexShrink: 0,
-        }}>ST</span>
-        SiteTracker
-      </a>
+        }}>
+          <span style={{
+            width: 30,
+            height: 30,
+            background: '#3b82f6',
+            borderRadius: 7,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 13,
+            fontWeight: 800,
+            letterSpacing: '-0.5px',
+            flexShrink: 0,
+          }}>ST</span>
+          SiteTracker
+        </a>
+
+        {user && (
+          <nav style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            {NAV_LINKS.map(link => {
+              const isActive = location.pathname === link.path;
+              return (
+                <a
+                  key={link.path}
+                  href={link.path}
+                  style={{
+                    fontSize: 13,
+                    fontWeight: isActive ? 700 : 500,
+                    color: isActive ? '#fff' : '#94a3b8',
+                    textDecoration: 'none',
+                    padding: '5px 12px',
+                    borderRadius: 7,
+                    background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
+                    transition: 'all 0.15s',
+                    whiteSpace: 'nowrap',
+                  }}
+                  onMouseEnter={e => {
+                    if (!isActive) {
+                      e.currentTarget.style.color = '#e2e8f0';
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    if (!isActive) {
+                      e.currentTarget.style.color = '#94a3b8';
+                      e.currentTarget.style.background = 'transparent';
+                    }
+                  }}
+                >
+                  {link.label}
+                </a>
+              );
+            })}
+          </nav>
+        )}
+      </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         {right && <div>{right}</div>}
@@ -57,12 +116,12 @@ function Header({ right }) {
                 fontWeight: 700,
                 textTransform: 'uppercase',
                 letterSpacing: '0.08em',
-                color: isAdmin ? '#60a5fa' : '#94a3b8',
-                background: isAdmin ? 'rgba(59,130,246,0.15)' : 'rgba(148,163,184,0.12)',
+                color: admin ? '#60a5fa' : '#94a3b8',
+                background: admin ? 'rgba(59,130,246,0.15)' : 'rgba(148,163,184,0.12)',
                 padding: '1px 6px',
                 borderRadius: 4,
               }}>
-                {isAdmin ? 'Admin' : 'Superintendent'}
+                {admin ? 'Admin' : 'Superintendent'}
               </span>
             </div>
             <button

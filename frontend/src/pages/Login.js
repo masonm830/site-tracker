@@ -18,6 +18,7 @@ function Login() {
     try {
       const res = await axios.post(`${API}/api/auth/login`, { email, password });
       sessionStorage.setItem('token', res.data.token);
+      sessionStorage.setItem('refresh_token', res.data.refresh_token);
       sessionStorage.setItem('user', JSON.stringify({ email: res.data.email, role: res.data.role }));
       navigate('/');
     } catch (err) {

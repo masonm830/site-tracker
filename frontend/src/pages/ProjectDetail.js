@@ -7,10 +7,10 @@ import { getToken, isAdmin } from '../utils/auth';
 const API = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 const s = {
-  page: { minHeight: '100vh', background: '#f1f5f9' },
+  page: { minHeight: '100vh', background: '#707880' },
   main: { maxWidth: 780, margin: '0 auto', padding: '32px 20px 60px' },
   back: {
-    display: 'inline-flex', alignItems: 'center', gap: 6, color: '#64748b',
+    display: 'inline-flex', alignItems: 'center', gap: 6, color: '#e2e8f0',
     fontSize: 13, marginBottom: 20, cursor: 'pointer', background: 'none',
     border: 'none', padding: 0, fontFamily: 'inherit', fontWeight: 500,
   },

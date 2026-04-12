@@ -7,13 +7,13 @@ import { getToken } from '../utils/auth';
 const API = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 const styles = {
-  page: { minHeight: '100vh', background: '#f8fafc' },
+  page: { minHeight: '100vh', background: '#707880' },
   main: { maxWidth: 560, margin: '0 auto', padding: '40px 20px' },
   back: {
     display: 'inline-flex',
     alignItems: 'center',
     gap: 6,
-    color: '#64748b',
+    color: '#e2e8f0',
     textDecoration: 'none',
     fontSize: 14,
     marginBottom: 24,

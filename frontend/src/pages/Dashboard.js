@@ -19,14 +19,14 @@ function formatDate(iso) {
 }
 
 const s = {
-  page: { minHeight: '100vh', background: '#f1f5f9' },
+  page: { minHeight: '100vh', background: '#707880' },
   main: { maxWidth: 1200, margin: '0 auto', padding: '36px 24px' },
   topRow: {
     display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
     marginBottom: 32, flexWrap: 'wrap', gap: 16,
   },
-  heading: { fontSize: 28, fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.5px' },
-  subheading: { fontSize: 14, color: '#64748b', marginTop: 4 },
+  heading: { fontSize: 28, fontWeight: 800, color: '#fff', margin: 0, letterSpacing: '-0.5px' },
+  subheading: { fontSize: 14, color: '#cbd5e1', marginTop: 4 },
   newBtn: {
     background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 10,
     padding: '10px 20px', fontSize: 14, fontWeight: 700, cursor: 'pointer',
@@ -192,21 +192,12 @@ function Dashboard() {
 
   return (
     <div style={s.page}>
-      <Header right={
-        <button
-          style={s.newBtn}
-          onClick={() => navigate('/projects/new')}
-          onMouseEnter={e => e.currentTarget.style.background = '#2563eb'}
-          onMouseLeave={e => e.currentTarget.style.background = '#3b82f6'}
-        >
-          + New Project
-        </button>
-      } />
+      <Header />
 
       <main style={s.main}>
         <div style={s.topRow}>
           <div>
-            <h1 style={s.heading}>Projects</h1>
+            <h1 style={s.heading}>Daily Logs</h1>
             <p style={s.subheading}>
               {loading ? 'Loading...' : `${projects.length} active project${projects.length !== 1 ? 's' : ''}`}
             </p>
@@ -216,22 +207,24 @@ function Dashboard() {
         {error && <div style={s.error}>{error}</div>}
 
         {loading ? (
-          <p style={{ color: '#94a3b8', textAlign: 'center', paddingTop: 60, fontSize: 15 }}>
+          <p style={{ color: '#e2e8f0', textAlign: 'center', paddingTop: 60, fontSize: 15 }}>
             Loading projects...
           </p>
         ) : projects.length === 0 && !error ? (
           <div style={s.empty}>
             <div style={s.emptyIcon}>🏗️</div>
             <div style={s.emptyTitle}>No projects yet</div>
-            <p style={s.emptyText}>Create your first project to start tracking progress.</p>
-            <button
-              style={s.newBtn}
-              onClick={() => navigate('/projects/new')}
-              onMouseEnter={e => e.currentTarget.style.background = '#2563eb'}
-              onMouseLeave={e => e.currentTarget.style.background = '#3b82f6'}
-            >
-              + New Project
-            </button>
+            <p style={s.emptyText}>No projects have been created yet.</p>
+            {admin && (
+              <button
+                style={s.newBtn}
+                onClick={() => navigate('/projects/new')}
+                onMouseEnter={e => e.currentTarget.style.background = '#2563eb'}
+                onMouseLeave={e => e.currentTarget.style.background = '#3b82f6'}
+              >
+                + New Project
+              </button>
+            )}
           </div>
         ) : (
           <div style={s.grid}>

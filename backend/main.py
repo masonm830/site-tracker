@@ -66,6 +66,49 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class TradeLogCreate(BaseModel):
+    project_id: str
+    trade_company: str
+    work_description: str
+    is_issue: bool = False
+    issue_description: str | None = None
+    photo_urls: list[str] = []
+
+
+class TradeLogUpdate(BaseModel):
+    trade_company: str | None = None
+    work_description: str | None = None
+    is_issue: bool | None = None
+    issue_description: str | None = None
+    photo_urls: list[str] | None = None
+
+
+class PunchListCreate(BaseModel):
+    project_id: str
+    description: str
+    trade_responsible: str | None = None
+    status: str = "open"
+    priority: str = "medium"
+    photo_urls: list[str] = []
+    due_date: str | None = None
+    notes: str | None = None
+
+
+class PunchListUpdate(BaseModel):
+    description: str | None = None
+    trade_responsible: str | None = None
+    status: str | None = None
+    priority: str | None = None
+    photo_urls: list[str] | None = None
+    due_date: str | None = None
+    notes: str | None = None
+    completed_at: str | None = None
+
+
 # --- Helpers ---
 
 def extract_storage_filename(url: str) -> str | None:
@@ -149,9 +192,27 @@ def login(body: LoginRequest):
 
     return {
         "token": session.access_token,
+        "refresh_token": session.refresh_token,
         "email": user.email,
         "role": role,
     }
+
+
+@app.post("/api/auth/refresh")
+def refresh_token(body: RefreshRequest):
+    try:
+        response = supabase.auth.refresh_session(body.refresh_token)
+        session = response.session
+        if not session:
+            raise HTTPException(status_code=401, detail="Could not refresh session")
+        return {
+            "token": session.access_token,
+            "refresh_token": session.refresh_token,
+        }
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=401, detail="Could not refresh session")
 
 
 @app.post("/api/auth/logout")
@@ -338,6 +399,169 @@ def get_project_by_share_token(share_token: str):
         log["photo_urls"] = normalize_photo_urls(log)
     project["logs"] = logs
     return project
+
+
+# --- Trade Logs ---
+
+@app.get("/api/trade-logs")
+def get_trade_logs(
+    project_id: str | None = None,
+    is_issue: bool | None = None,
+    current_user: dict = Depends(get_current_user),
+):
+    query = supabase.table("trade_logs").select("*").order("created_at", desc=True)
+    if project_id:
+        query = query.eq("project_id", project_id)
+    if is_issue is not None:
+        query = query.eq("is_issue", is_issue)
+    result = query.execute()
+    return result.data
+
+
+@app.post("/api/trade-logs", status_code=201)
+def create_trade_log(body: TradeLogCreate, current_user: dict = Depends(get_current_user)):
+    data = body.model_dump()
+    data["logged_by"] = current_user["id"]
+    result = supabase.table("trade_logs").insert(data).execute()
+    if not result.data:
+        raise HTTPException(status_code=500, detail="Failed to create trade log")
+    return result.data[0]
+
+
+@app.patch("/api/trade-logs/{log_id}")
+def update_trade_log(log_id: str, body: TradeLogUpdate, current_user: dict = Depends(get_current_user)):
+    existing = supabase.table("trade_logs").select("id").eq("id", log_id).maybe_single().execute()
+    if not existing.data:
+        raise HTTPException(status_code=404, detail="Trade log not found")
+    updates = body.model_dump(exclude_unset=True)
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+    result = supabase.table("trade_logs").update(updates).eq("id", log_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Trade log not found")
+    return result.data[0]
+
+
+@app.delete("/api/trade-logs/{log_id}", status_code=204)
+def delete_trade_log(log_id: str, current_user: dict = Depends(get_current_user)):
+    existing = supabase.table("trade_logs").select("id").eq("id", log_id).maybe_single().execute()
+    if not existing.data:
+        raise HTTPException(status_code=404, detail="Trade log not found")
+    supabase.table("trade_logs").delete().eq("id", log_id).execute()
+
+
+# --- Punch List ---
+
+@app.get("/api/punch-list")
+def get_punch_list(
+    project_id: str | None = None,
+    status: str | None = None,
+    current_user: dict = Depends(get_current_user),
+):
+    query = supabase.table("punch_list_items").select("*").order("created_at", desc=True)
+    if project_id:
+        query = query.eq("project_id", project_id)
+    if status:
+        query = query.eq("status", status)
+    result = query.execute()
+    return result.data
+
+
+@app.post("/api/punch-list", status_code=201)
+def create_punch_list_item(body: PunchListCreate, current_user: dict = Depends(get_current_user)):
+    data = body.model_dump()
+    result = supabase.table("punch_list_items").insert(data).execute()
+    if not result.data:
+        raise HTTPException(status_code=500, detail="Failed to create punch list item")
+    return result.data[0]
+
+
+@app.patch("/api/punch-list/{item_id}")
+def update_punch_list_item(item_id: str, body: PunchListUpdate, current_user: dict = Depends(get_current_user)):
+    existing = supabase.table("punch_list_items").select("id, status").eq("id", item_id).maybe_single().execute()
+    if not existing.data:
+        raise HTTPException(status_code=404, detail="Punch list item not found")
+    updates = body.model_dump(exclude_unset=True)
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    # Auto-set completed_at when status changes to completed
+    if updates.get("status") == "completed" and "completed_at" not in updates:
+        updates["completed_at"] = datetime.now(timezone.utc).isoformat()
+    elif updates.get("status") in ("open", "in_progress"):
+        updates["completed_at"] = None
+    result = supabase.table("punch_list_items").update(updates).eq("id", item_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Punch list item not found")
+    return result.data[0]
+
+
+@app.delete("/api/punch-list/{item_id}", status_code=204)
+def delete_punch_list_item(item_id: str, current_user: dict = Depends(get_current_user)):
+    existing = supabase.table("punch_list_items").select("id").eq("id", item_id).maybe_single().execute()
+    if not existing.data:
+        raise HTTPException(status_code=404, detail="Punch list item not found")
+    supabase.table("punch_list_items").delete().eq("id", item_id).execute()
+
+
+# --- Daily Report ---
+
+@app.get("/api/daily-report/{project_id}")
+def get_daily_report(
+    project_id: str,
+    date: str | None = None,
+    current_user: dict = Depends(get_current_user),
+):
+    if date is None:
+        date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    day_start = f"{date}T00:00:00+00:00"
+    day_end = f"{date}T23:59:59+00:00"
+
+    project_result = supabase.table("projects").select("id, name, address").eq("id", project_id).maybe_single().execute()
+    if not project_result.data:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    progress_logs = (
+        supabase.table("logs")
+        .select("*")
+        .eq("project_id", project_id)
+        .gte("created_at", day_start)
+        .lte("created_at", day_end)
+        .order("created_at")
+        .execute()
+    ).data
+
+    trade_logs = (
+        supabase.table("trade_logs")
+        .select("*")
+        .eq("project_id", project_id)
+        .gte("created_at", day_start)
+        .lte("created_at", day_end)
+        .order("created_at")
+        .execute()
+    ).data
+
+    punch_activity = (
+        supabase.table("punch_list_items")
+        .select("*")
+        .eq("project_id", project_id)
+        .gte("created_at", day_start)
+        .lte("created_at", day_end)
+        .order("created_at")
+        .execute()
+    ).data
+
+    for log in progress_logs:
+        log["photo_urls"] = normalize_photo_urls(log)
+
+    return {
+        "project": project_result.data,
+        "date": date,
+        "progress_logs": progress_logs,
+        "trade_logs": trade_logs,
+        "punch_activity": punch_activity,
+    }
 
 
 # --- Photo upload ---
